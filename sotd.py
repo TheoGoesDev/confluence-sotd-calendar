@@ -64,7 +64,9 @@ def create_event(config: dict, engineer: str, event_date: date) -> requests.Resp
 
 
 @click.command()
-@click.option("--number-of-days", required=True, type=int, help="Number of calendar days to schedule.")
+@click.option(
+    "--number-of-days", required=True, type=int, help="Number of calendar days to schedule."
+)
 @click.option("--engineers", required=True, help="Comma-separated list of engineer names.")
 @click.option(
     "--start-date",
@@ -98,7 +100,7 @@ def main(number_of_days: int, engineers: str, start_date: str | None) -> None:
 
     click.echo(f"\nScheduling {len(assignments)} SOTD events from {days[0]} to {days[-1]}:\n")
     click.echo(f"  {'Date':<20} {'Engineer'}")
-    click.echo(f"  {'-'*20} {'-'*20}")
+    click.echo(f"  {'-' * 20} {'-' * 20}")
     for d, eng in assignments:
         click.echo(f"  {str(d):<20} {eng}")
 
