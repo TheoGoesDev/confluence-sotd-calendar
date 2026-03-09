@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Create Support of the Day (SOTD) calendar events in Confluence Team Calendars."""
 
+import calendar
 import itertools
 import os
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import click
 import requests
@@ -30,13 +31,15 @@ def load_config() -> dict:
     return config
 
 
-def workdays(start: date, num_days: int) -> list[date]:
+def month_workdays(year: int, month: int, start_from: date) -> list[date]:
+    """Return all Mon–Fri dates in the given month, starting from start_from."""
+    first = max(date(year, month, 1), start_from)
+    last_day = calendar.monthrange(year, month)[1]
     result = []
-    current = start
-    for _ in range(num_days):
-        if current.weekday() < 5:
-            result.append(current)
-        current += timedelta(days=1)
+    for day in range(first.day, last_day + 1):
+        d = date(year, month, day)
+        if d.weekday() < 5:
+            result.append(d)
     return result
 
 
@@ -64,36 +67,50 @@ def create_event(config: dict, engineer: str, event_date: date) -> requests.Resp
 
 
 @click.command()
-@click.option(
-    "--number-of-days", required=True, type=int, help="Number of calendar days to schedule."
-)
 @click.option("--engineers", required=True, help="Comma-separated list of engineer names.")
 @click.option(
-    "--start-date",
+    "--month",
     default=None,
-    help="Start date in YYYY-MM-DD format (default: tomorrow).",
+    help="Target month in YYYY-MM format (default: current month).",
 )
-def main(number_of_days: int, engineers: str, start_date: str | None) -> None:
+@click.option(
+    "--dry-run", is_flag=True, default=False, help="Preview schedule without creating events."
+)
+def main(engineers: str, month: str | None, dry_run: bool) -> None:
     """Create SOTD calendar events in Confluence for a round-robin engineer rotation."""
-    config = load_config()
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
 
-    if start_date:
+    if month:
         try:
-            start = date.fromisoformat(start_date)
+            parsed = datetime.strptime(month, "%Y-%m")
+            target_year, target_month = parsed.year, parsed.month
         except ValueError:
-            click.echo(f"Error: invalid date format '{start_date}', expected YYYY-MM-DD.", err=True)
+            click.echo(f"Error: invalid month format '{month}', expected YYYY-MM.", err=True)
             sys.exit(1)
     else:
-        start = date.today() + timedelta(days=1)
+        target_year, target_month = tomorrow.year, tomorrow.month
+
+    # Determine start date within the target month
+    if (target_year, target_month) < (today.year, today.month):
+        click.echo(
+            f"Error: cannot schedule events for a past month ({target_year}-{target_month:02d}).",
+            err=True,
+        )
+        sys.exit(1)
+    elif (target_year, target_month) == (today.year, today.month):
+        start_from = tomorrow
+    else:
+        start_from = date(target_year, target_month, 1)
 
     engineer_list = [e.strip() for e in engineers.split(",") if e.strip()]
     if not engineer_list:
         click.echo("Error: no engineers provided.", err=True)
         sys.exit(1)
 
-    days = workdays(start, number_of_days)
+    days = month_workdays(target_year, target_month, start_from)
     if not days:
-        click.echo("No workdays found in the specified range.")
+        click.echo(f"No workdays remaining in {target_year}-{target_month:02d}.")
         sys.exit(0)
 
     assignments = list(zip(days, itertools.cycle(engineer_list)))
@@ -105,6 +122,12 @@ def main(number_of_days: int, engineers: str, start_date: str | None) -> None:
         click.echo(f"  {str(d):<20} {eng}")
 
     click.echo()
+    if dry_run:
+        click.echo("Dry run complete. No events created.")
+        sys.exit(0)
+
+    config = load_config()
+
     if not click.confirm("Create these events in Confluence?"):
         click.echo("Aborted.")
         sys.exit(0)
