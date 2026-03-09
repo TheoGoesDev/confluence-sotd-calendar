@@ -4,6 +4,7 @@
 import calendar
 import itertools
 import os
+import random
 import sys
 from datetime import date, datetime, timedelta
 
@@ -41,6 +42,33 @@ def month_workdays(year: int, month: int, start_from: date) -> list[date]:
         if d.weekday() < 5:
             result.append(d)
     return result
+
+
+def assign_engineers(days: list[date], engineers: list[str]) -> list[tuple[date, str]]:
+    """Assign engineers to days, shuffling the rotation each week for fairness."""
+    assignments = []
+    week_days: list[date] = []
+    current_week = None
+
+    for d in days:
+        week = d.isocalendar()[:2]  # (year, week_number)
+        if week != current_week:
+            if week_days:
+                rng = random.Random(f"{current_week[0]}-W{current_week[1]}")
+                shuffled = list(engineers)
+                rng.shuffle(shuffled)
+                assignments.extend(zip(week_days, itertools.cycle(shuffled)))
+            week_days = []
+            current_week = week
+        week_days.append(d)
+
+    if week_days:
+        rng = random.Random(f"{current_week[0]}-W{current_week[1]}")
+        shuffled = list(engineers)
+        rng.shuffle(shuffled)
+        assignments.extend(zip(week_days, itertools.cycle(shuffled)))
+
+    return assignments
 
 
 def format_date(d: date) -> str:
@@ -113,13 +141,13 @@ def main(engineers: str, month: str | None, dry_run: bool) -> None:
         click.echo(f"No workdays remaining in {target_year}-{target_month:02d}.")
         sys.exit(0)
 
-    assignments = list(zip(days, itertools.cycle(engineer_list)))
+    assignments = assign_engineers(days, engineer_list)
 
     click.echo(f"\nScheduling {len(assignments)} SOTD events from {days[0]} to {days[-1]}:\n")
-    click.echo(f"  {'Date':<20} {'Engineer'}")
-    click.echo(f"  {'-' * 20} {'-' * 20}")
+    click.echo(f"  {'Date':<20} {'Day':<6}{'Engineer'}")
+    click.echo(f"  {'-' * 20} {'-' * 5} {'-' * 20}")
     for d, eng in assignments:
-        click.echo(f"  {str(d):<20} {eng}")
+        click.echo(f"  {str(d):<20} {d.strftime('%a'):<6}{eng}")
 
     click.echo()
     if dry_run:

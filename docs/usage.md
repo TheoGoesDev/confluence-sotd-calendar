@@ -41,11 +41,11 @@ Output:
 ```
 Scheduling 22 SOTD events from 2026-04-01 to 2026-04-30:
 
-  Date                 Engineer
-  -------------------- --------------------
-  2026-04-01           theo
-  2026-04-02           hari
-  2026-04-03           olivier
+  Date                 Day   Engineer
+  -------------------- ----- --------------------
+  2026-04-01           Wed   hari
+  2026-04-02           Thu   theo
+  2026-04-03           Fri   olivier
   ...
 
 Dry run complete. No events created.
@@ -56,5 +56,6 @@ Dry run complete. No events created.
 - Weekends are automatically skipped.
 - When no `--month` is given, the current month is used and scheduling starts from tomorrow.
 - When a future month is specified, all workdays in that month are scheduled.
+- The engineer rotation is shuffled each week for fairness, but the shuffle is deterministic (same input always produces the same schedule).
 - Events are created as all-day events titled `"SOTD: <engineer_name>"`.
 - The script exits with code `1` if any events fail to create.
